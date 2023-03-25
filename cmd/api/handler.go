@@ -49,7 +49,7 @@ type jsonResponse struct {
 func (c *Config) broker(w http.ResponseWriter, r *http.Request) {
 	response := jsonResponse{
 		Error:   false,
-		Message: "hit the broken service",
+		Message: "Hit the broken service",
 	}
 	output, _ := json.MarshalIndent(response, "", "  ")
 	w.Header().Set("Content-type", "application/json")

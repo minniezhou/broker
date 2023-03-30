@@ -37,6 +37,7 @@ func (c *Config) Newhandler() *Handler {
 
 func (c *Config) getHello(w http.ResponseWriter, r *http.Request) {
 	fmt.Printf("got /hello request\n")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 	io.WriteString(w, "Hello, HTTP!\n")
 }
 
@@ -52,6 +53,7 @@ func (c *Config) broker(w http.ResponseWriter, r *http.Request) {
 		Message: "Hit the broken service",
 	}
 	output, _ := json.MarshalIndent(response, "", "  ")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Content-type", "application/json")
 	w.WriteHeader(http.StatusAccepted)
 	w.Write(output)

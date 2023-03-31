@@ -1,9 +1,6 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
-	"io"
 	"net/http"
 
 	"github.com/go-chi/chi"
@@ -36,15 +33,11 @@ func (c *Config) Newhandler() *Handler {
 }
 
 func (c *Config) getHello(w http.ResponseWriter, r *http.Request) {
-	fmt.Printf("got /hello request\n")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	io.WriteString(w, "Hello, HTTP!\n")
-}
-
-type jsonResponse struct {
-	Error   bool   `json:"error"`
-	Message string `json:"message"`
-	Data    any    `json:"data,omitempty"`
+	response := jsonResponse{
+		Error:   false,
+		Message: "Hello Http!!",
+	}
+	c.writeJSON(w, http.StatusAccepted, response)
 }
 
 func (c *Config) broker(w http.ResponseWriter, r *http.Request) {
@@ -52,9 +45,5 @@ func (c *Config) broker(w http.ResponseWriter, r *http.Request) {
 		Error:   false,
 		Message: "Hit the broken service",
 	}
-	output, _ := json.MarshalIndent(response, "", "  ")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Content-type", "application/json")
-	w.WriteHeader(http.StatusAccepted)
-	w.Write(output)
+	c.writeJSON(w, http.StatusAccepted, response)
 }

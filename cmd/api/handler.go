@@ -1,6 +1,9 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/go-chi/chi"
@@ -10,6 +13,27 @@ import (
 
 type Handler struct {
 	router *chi.Mux
+}
+
+const (
+	Authorization string = "authentication"
+	Logging       string = "logging"
+)
+
+type requestType struct {
+	Action string   `json:"action"`
+	Auth   authType `json:"auth,omitempty"`
+	Log    logType  `json:"log,omitempty"`
+}
+
+type authType struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+type logType struct {
+	Name    string `json:"name"`
+	Message string `json:"message"`
 }
 
 func (c *Config) Newhandler() *Handler {
@@ -27,6 +51,7 @@ func (c *Config) Newhandler() *Handler {
 	r.Use(middleware.Logger)
 	r.Post("/", c.broker)
 	r.Get("/hello", c.getHello)
+	r.Post("/handle", c.handle)
 	return &Handler{
 		router: r,
 	}
@@ -46,4 +71,77 @@ func (c *Config) broker(w http.ResponseWriter, r *http.Request) {
 		Message: "Hit the broken service",
 	}
 	c.writeJSON(w, http.StatusAccepted, response)
+}
+
+func (c *Config) handle(w http.ResponseWriter, r *http.Request) {
+	var request requestType
+	c.readJSON(w, r, &request)
+	switch request.Action {
+	case Authorization:
+		c.handleAuthorization(request.Auth, w)
+	case Logging:
+		c.handleLogging(request.Log, w)
+	default:
+		c.ErrorJSON(w, errors.New("Unknown action type"))
+	}
+}
+
+func (c *Config) handleAuthorization(request authType, w http.ResponseWriter) {
+	postBody, _ := json.Marshal(request)
+	responseBody := bytes.NewBuffer(postBody)
+	resp, err := http.Post("http://localhost:80/auth", "application/json", responseBody)
+	if err != nil {
+		c.ErrorJSON(w, errors.New("Authrization error, request failed"), http.StatusAccepted)
+		return
+	}
+	defer resp.Body.Close()
+
+	var payloadfromService jsonResponse
+	err = json.NewDecoder(resp.Body).Decode(&payloadfromService)
+	if err != nil {
+		c.ErrorJSON(w, errors.New("Authentication failed"), http.StatusAccepted)
+		return
+	}
+
+	if payloadfromService.Error {
+		c.ErrorJSON(w, errors.New("Authentication failed"), http.StatusAccepted)
+		return
+	}
+	var payload jsonResponse
+	payload.Error = false
+	payload.Message = "Authenticated"
+	payload.Data = payloadfromService.Data
+
+	c.writeJSON(w, http.StatusAccepted, payload)
+
+}
+
+func (c *Config) handleLogging(request logType, w http.ResponseWriter) {
+	postBody, _ := json.Marshal(request)
+	responseBody := bytes.NewBuffer(postBody)
+	resp, err := http.Post("http://localhost:4321/log", "application/json", responseBody)
+	if err != nil {
+		c.ErrorJSON(w, errors.New("Logging error"), http.StatusAccepted)
+		return
+	}
+	defer resp.Body.Close()
+
+	var payloadfromService jsonResponse
+	err = json.NewDecoder(resp.Body).Decode(&payloadfromService)
+	if err != nil {
+		c.ErrorJSON(w, errors.New("Log failed"), http.StatusAccepted)
+		return
+	}
+
+	if payloadfromService.Error {
+		c.ErrorJSON(w, errors.New("Log failed"), http.StatusAccepted)
+		return
+	}
+	var payload jsonResponse
+	payload.Error = false
+	payload.Message = "Logged"
+	payload.Data = payloadfromService.Data
+
+	c.writeJSON(w, http.StatusAccepted, payload)
+
 }

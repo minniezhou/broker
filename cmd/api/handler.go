@@ -18,12 +18,14 @@ type Handler struct {
 const (
 	Authorization string = "authentication"
 	Logging       string = "logging"
+	Send          string = "send"
 )
 
 type requestType struct {
 	Action string   `json:"action"`
 	Auth   authType `json:"auth,omitempty"`
 	Log    logType  `json:"log,omitempty"`
+	Send   sendType `json:"send,omitempty"`
 }
 
 type authType struct {
@@ -34,6 +36,15 @@ type authType struct {
 type logType struct {
 	Name    string `json:"name"`
 	Message string `json:"message"`
+}
+
+type sendType struct {
+	From       string   `josn:"from,omitempty"`
+	FromName   string   `josn:"from_name,omitempty"`
+	To         string   `josn:"to"`
+	Subject    string   `josn:"subject"`
+	Body       string   `json:"body"`
+	Attachment []string `josn:"attachments,omitempty"`
 }
 
 func (c *Config) Newhandler() *Handler {
@@ -81,6 +92,8 @@ func (c *Config) handle(w http.ResponseWriter, r *http.Request) {
 		c.handleAuthorization(request.Auth, w)
 	case Logging:
 		c.handleLogging(request.Log, w)
+	case Send:
+		c.handleSendEmail(request.Send, w)
 	default:
 		c.ErrorJSON(w, errors.New("Unknown action type"))
 	}
@@ -140,6 +153,36 @@ func (c *Config) handleLogging(request logType, w http.ResponseWriter) {
 	var payload jsonResponse
 	payload.Error = false
 	payload.Message = "Logged"
+	payload.Data = payloadfromService.Data
+
+	c.writeJSON(w, http.StatusAccepted, payload)
+
+}
+
+func (c *Config) handleSendEmail(request sendType, w http.ResponseWriter) {
+	postBody, _ := json.Marshal(request)
+	responseBody := bytes.NewBuffer(postBody)
+	resp, err := http.Post("http://localhost:54321/send", "application/json", responseBody)
+	if err != nil {
+		c.ErrorJSON(w, errors.New("Sending Email error"), http.StatusAccepted)
+		return
+	}
+	defer resp.Body.Close()
+
+	var payloadfromService jsonResponse
+	err = json.NewDecoder(resp.Body).Decode(&payloadfromService)
+	if err != nil {
+		c.ErrorJSON(w, errors.New("Sending Email failed"), http.StatusAccepted)
+		return
+	}
+
+	if payloadfromService.Error {
+		c.ErrorJSON(w, errors.New("Sending Email failed"), http.StatusAccepted)
+		return
+	}
+	var payload jsonResponse
+	payload.Error = false
+	payload.Message = "Email Sent"
 	payload.Data = payloadfromService.Data
 
 	c.writeJSON(w, http.StatusAccepted, payload)

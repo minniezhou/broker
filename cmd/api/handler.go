@@ -2,13 +2,18 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type Handler struct {
@@ -69,6 +74,29 @@ func (c *Config) Newhandler() *Handler {
 }
 
 func (c *Config) getHello(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	body := "Hello World!"
+	err := c.ch.PublishWithContext(ctx,
+		"",        // exchange
+		queneName, // routing key
+		false,     // mandatory
+		false,     // immediate
+		amqp.Publishing{
+			ContentType: "text/plain",
+			Body:        []byte(body),
+		})
+	if err != nil {
+		fmt.Println(err.Error())
+		response := jsonResponse{
+			Error:   true,
+			Message: "Send to Queue Error!!",
+		}
+		c.writeJSON(w, http.StatusBadRequest, response)
+		return
+	}
+
+	fmt.Printf(" [x] Sent %s\n", body)
 	response := jsonResponse{
 		Error:   false,
 		Message: "Hello Http!!",

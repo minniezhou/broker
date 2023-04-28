@@ -67,7 +67,7 @@ func (c *Config) Newhandler() *Handler {
 	r.Use(middleware.Logger)
 	r.Post("/", c.broker)
 	r.Get("/hello", c.getHello)
-	r.Post("/handle", c.handle)
+	r.Post("/handle", c.handleEvent)
 	return &Handler{
 		router: r,
 	}
@@ -215,4 +215,30 @@ func (c *Config) handleSendEmail(request sendType, w http.ResponseWriter) {
 
 	c.writeJSON(w, http.StatusAccepted, payload)
 
+}
+
+func (c *Config) handleEvent(w http.ResponseWriter, r *http.Request) {
+	var request requestType
+	c.readJSON(w, r, &request)
+	postBody, _ := json.Marshal(request)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	err := c.ch.PublishWithContext(ctx,
+		"",        // exchange
+		queneName, // routing key
+		false,     // mandatory
+		false,     // immediate
+		amqp.Publishing{
+			ContentType: "text/plain",
+			Body:        []byte(postBody),
+		})
+	if err != nil {
+		fmt.Println(err.Error())
+		response := jsonResponse{
+			Error:   true,
+			Message: "Send to Queue Error!!",
+		}
+		c.writeJSON(w, http.StatusBadRequest, response)
+		return
+	}
 }

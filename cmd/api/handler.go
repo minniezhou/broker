@@ -1,17 +1,21 @@
 package main
 
 import (
+	"broker/api/logging"
 	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
@@ -67,7 +71,8 @@ func (c *Config) Newhandler() *Handler {
 	r.Use(middleware.Logger)
 	r.Post("/", c.broker)
 	r.Get("/hello", c.getHello)
-	r.Post("/handle", c.handleEvent)
+	r.Post("/handle", c.handle)
+	r.Post("/grpclog", c.handleLoggingViaGRPC)
 	return &Handler{
 		router: r,
 	}
@@ -241,4 +246,37 @@ func (c *Config) handleEvent(w http.ResponseWriter, r *http.Request) {
 		c.writeJSON(w, http.StatusBadRequest, response)
 		return
 	}
+}
+
+func (c *Config) handleLoggingViaGRPC(w http.ResponseWriter, r *http.Request) {
+	var request requestType
+	c.readJSON(w, r, &request)
+	if request.Action != Logging {
+		c.ErrorJSON(w, errors.New("Error Action Type. Logging Action is needed"), http.StatusAccepted)
+		return
+	}
+	conn, err := grpc.Dial("localhost:43210", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatalf("did not connect: %v", err)
+		fmt.Println("connect to grcp log failed")
+	}
+	defer conn.Close()
+	fmt.Println("New client")
+	client := logging.NewLogClient(conn)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	resp, err := client.LogViaGRPC(ctx, &logging.LogRequest{Name: request.Log.Name, Data: request.Log.Message})
+
+	if err != nil {
+		c.ErrorJSON(w, errors.New("Log failed via GRPC"), http.StatusAccepted)
+		return
+	}
+
+	var payload jsonResponse
+	payload.Error = false
+	payload.Message = "Logged via GRPC"
+	payload.Data = resp.Message
+
+	c.writeJSON(w, http.StatusAccepted, payload)
+
 }

@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package api.v1;
+
+option go_package = "/v1;logging";
+
+message LogRequest {
+    string Name = 1;
+    string Data = 2;
+}
+
+message LogResponse {
+    string message = 1;
+}
+
+service Log {
+    rpc LogViaGRPC (LogRequest) returns (LogResponse) {}
+}

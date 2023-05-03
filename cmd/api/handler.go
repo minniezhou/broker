@@ -73,6 +73,7 @@ func (c *Config) Newhandler() *Handler {
 	r.Get("/hello", c.getHello)
 	r.Post("/handle", c.handle)
 	r.Post("/grpclog", c.handleLoggingViaGRPC)
+	r.Post("/handleviaqueue", c.handleEvent)
 	return &Handler{
 		router: r,
 	}
@@ -246,6 +247,12 @@ func (c *Config) handleEvent(w http.ResponseWriter, r *http.Request) {
 		c.writeJSON(w, http.StatusBadRequest, response)
 		return
 	}
+	fmt.Println("sent to queue")
+	response := jsonResponse{
+		Error:   false,
+		Message: "Request Sent to Queue!!",
+	}
+	c.writeJSON(w, http.StatusAccepted, response)
 }
 
 func (c *Config) handleLoggingViaGRPC(w http.ResponseWriter, r *http.Request) {

@@ -16,6 +16,12 @@ type Config struct {
 	ch   *amqp.Channel
 }
 
+const (
+	RABBITMQ_DEFAULT_PASS = "guest"
+	RABBITMQ_DEFAULT_USER = "guest"
+	RABBITMQ_URL          = "localhost"
+)
+
 const queneName = "broker"
 
 func main() {
@@ -46,7 +52,11 @@ func connectToRabbit() (*amqp.Connection, error) {
 	backoff := time.Second
 	log.Println("Connecting to Rabbit...")
 	for {
-		conn, err := amqp.Dial("amqp://guest:guest@localhost:5672/")
+		rabbit_pass := getEnv("RABBITMQ_DEFAULT_PASS", RABBITMQ_DEFAULT_PASS)
+		rabbit_user := getEnv("RABBITMQ_DEFAULT_USER", RABBITMQ_DEFAULT_USER)
+		rabbit_url := getEnv("RABBITMQ_URL", RABBITMQ_URL)
+		rabbit_addr := "amqp://" + rabbit_pass + ":" + rabbit_user + "@" + rabbit_url + ":5672/"
+		conn, err := amqp.Dial(rabbit_addr)
 		if err != nil {
 			count++
 			backoff = time.Duration(count*count) * time.Second
@@ -79,4 +89,12 @@ func declareChannel(conn *amqp.Connection) (*amqp.Channel, error) {
 		return nil, err
 	}
 	return ch, nil
+}
+
+func getEnv(key, default_value string) string {
+	value := os.Getenv(key)
+	if len(value) == 0 {
+		return default_value
+	}
+	return value
 }

@@ -30,6 +30,12 @@ const (
 	Send          string = "send"
 )
 
+const (
+	AUTHENTICATION_SERVICE = "localhost"
+	LOGGING_SERVICE        = "localhost"
+	MAIL_SERVICE           = "localhost"
+)
+
 type requestType struct {
 	Action string   `json:"action"`
 	Auth   authType `json:"auth,omitempty"`
@@ -136,7 +142,8 @@ func (c *Config) handle(w http.ResponseWriter, r *http.Request) {
 func (c *Config) handleAuthorization(request authType, w http.ResponseWriter) {
 	postBody, _ := json.Marshal(request)
 	responseBody := bytes.NewBuffer(postBody)
-	resp, err := http.Post("http://localhost:80/auth", "application/json", responseBody)
+	auth_url := getEnv("AUTHENTICATION_SERVICE", AUTHENTICATION_SERVICE)
+	resp, err := http.Post("http://"+auth_url+":80/auth", "application/json", responseBody)
 	if err != nil {
 		c.ErrorJSON(w, errors.New("Authrization error, request failed"), http.StatusAccepted)
 		return
@@ -166,7 +173,8 @@ func (c *Config) handleAuthorization(request authType, w http.ResponseWriter) {
 func (c *Config) handleLogging(request logType, w http.ResponseWriter) {
 	postBody, _ := json.Marshal(request)
 	responseBody := bytes.NewBuffer(postBody)
-	resp, err := http.Post("http://localhost:4321/log", "application/json", responseBody)
+	log_url := getEnv("LOGGING_SERVICE", LOGGING_SERVICE)
+	resp, err := http.Post("http://"+log_url+":4321/log", "application/json", responseBody)
 	if err != nil {
 		c.ErrorJSON(w, errors.New("Logging error"), http.StatusAccepted)
 		return
@@ -196,7 +204,8 @@ func (c *Config) handleLogging(request logType, w http.ResponseWriter) {
 func (c *Config) handleSendEmail(request sendType, w http.ResponseWriter) {
 	postBody, _ := json.Marshal(request)
 	responseBody := bytes.NewBuffer(postBody)
-	resp, err := http.Post("http://localhost:54321/send", "application/json", responseBody)
+	mail_url := getEnv("MAIL_SERVICE", MAIL_SERVICE)
+	resp, err := http.Post("http://"+mail_url+":54321/send", "application/json", responseBody)
 	if err != nil {
 		c.ErrorJSON(w, errors.New("Sending Email error"), http.StatusAccepted)
 		return
@@ -262,7 +271,8 @@ func (c *Config) handleLoggingViaGRPC(w http.ResponseWriter, r *http.Request) {
 		c.ErrorJSON(w, errors.New("Error Action Type. Logging Action is needed"), http.StatusAccepted)
 		return
 	}
-	conn, err := grpc.Dial("localhost:43210", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	log_url := getEnv("LOGGING_SERVICE", LOGGING_SERVICE)
+	conn, err := grpc.Dial(log_url+":43210", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
 		fmt.Println("connect to grcp log failed")

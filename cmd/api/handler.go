@@ -143,7 +143,7 @@ func (c *Config) handleAuthorization(request authType, w http.ResponseWriter) {
 	postBody, _ := json.Marshal(request)
 	responseBody := bytes.NewBuffer(postBody)
 	auth_url := getEnv("AUTHENTICATION_SERVICE", AUTHENTICATION_SERVICE)
-	resp, err := http.Post("http://"+auth_url+":80/auth", "application/json", responseBody)
+	resp, err := http.Post("http://"+auth_url+":85/auth", "application/json", responseBody)
 	if err != nil {
 		c.ErrorJSON(w, errors.New("Authrization error, request failed"), http.StatusAccepted)
 		return
